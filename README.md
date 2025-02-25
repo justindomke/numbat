@@ -250,7 +250,7 @@ If you don't want to learn a lot of features, you can (in principle) do everythi
 
 ## Full API docs
 
-API docs are here:
+API docs are at [https://justindomke.github.io/numbat/](https://justindomke.github.io/numbat/)
 
 ## Using Jax features
 
