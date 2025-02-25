@@ -1,8 +1,12 @@
-`numbat`: NumPy+Jax with named axes and an uncompromising attitude
+# Numbat
+
+NumPy+Jax with named axes and an uncompromising attitude
 
 ## Manifesto
 
-In NumPy (and PyTorch and Jax et al.)
+Does this resonate with you? 
+
+In NumPy (and PyTorch and Jax):
  
 * Broadcasting and batching and indexing are confusing and tedious.
 
@@ -10,13 +14,14 @@ In NumPy (and PyTorch and Jax et al.)
 
 * But why only Einstein *summation*? Why not Einstein *everything*?
 
-* And why not have the arrays remember which axis goes where, so you don't have to?
+* And why not have the arrays remember which axis goes where, so you don't have to keep repeating that?
 
 If so, you might like this package.
 
 ## Table of Contents
 
 <!-- TOC -->
+* [Numbat](#numbat)
   * [Manifesto](#manifesto)
   * [Table of Contents](#table-of-contents)
   * [Why use this instead of Jax?](#why-use-this-instead-of-jax)
@@ -336,10 +341,14 @@ You can do broadcasting in three ways:
 
 ## Friends
 
-There are many other projects that have experimented with named axes. Here are a few:
+* [xarray](https://docs.xarray.dev/en/stable/index.html)
 
+* [named tensors](https://pytorch.org/docs/stable/named_tensor.html) (in PyTorch)
 
-Note many existing libraries have experimented with named axes. (See [xarray](https://docs.xarray.dev/en/stable/index.html) or [named_tensors](https://pytorch.org/docs/stable/named_tensor.html) in PyTorch.) Though these kept positional axes around.
+* [Tensor Considered Harmful](http://nlp.seas.harvard.edu/NamedTensor.html)
 
+* [einops](https://github.com/arogozhnikov/einops)
 
-https://github.com/ctongfei/nexus
+* [xarray-einstats](https://github.com/arviz-devs/xarray-einstats)
+
+* [Nexus](https://github.com/ctongfei/nexus)  
