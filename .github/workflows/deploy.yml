@@ -25,7 +25,6 @@ jobs:
 
       # ADJUST THIS: install all dependencies (including pdoc)
       - run: pip install pdoc
-      - run: pip install -e .
       - run: pdoc --docformat numpy -n numbat -o ./docs
 
       - uses: actions/upload-pages-artifact@v3
