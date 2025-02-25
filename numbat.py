@@ -284,8 +284,6 @@ from collections import abc
 import builtins
 from numbers import Number
 
-from pangolin.util import WriteOnceDict
-
 _fundamental_stuff = ['Axis', 'ntensor']
 _qol_stuff = ['axes', 'allclose']
 _creation_stuff = ['ones', 'zeros', 'randn']
