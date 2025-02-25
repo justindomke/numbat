@@ -2,6 +2,8 @@
 
 NumPy+Jax with named axes and an uncompromising attitude
 
+![numbat](numbat.jpg)
+
 ## Manifesto
 
 Does this resonate with you? 
@@ -352,3 +354,5 @@ You can do broadcasting in three ways:
 * [xarray-einstats](https://github.com/arviz-devs/xarray-einstats)
 
 * [Nexus](https://github.com/ctongfei/nexus)  
+
+* [Numbat face](https://commons.wikimedia.org/wiki/File:Numbat_Face.jpg)
