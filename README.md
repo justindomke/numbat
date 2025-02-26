@@ -101,7 +101,7 @@ Here's how to do this in Numbat. First, you cast all the arrays to be named tens
 
 ```python
 import numbat as nb
-u, t, f  = axes()
+u, t, f  = nb.axes()
 x        = nb.ntensor(X,        u, t, f)
 ny_users = nb.ntensor(my_users, u, f)
 ny_times = nb.ntensor(my_times, t, u)
@@ -272,7 +272,7 @@ API docs are at [https://justindomke.github.io/numbat/](https://justindomke.gith
 
 ### Things that work out of the box
 
-`ntensor` is registered with Jax as a Pytree, so things like `jax.jit` and `jax.tree_flatten` work with `ntensor`s out of the box. For example, this is fine:
+`ntensor` is registered with Jax as a Pytree node, so things like `jax.jit` and `jax.tree_flatten` work with `ntensor`s out of the box. For example, this is fine:
 
 ```python
 import jax
@@ -296,7 +296,7 @@ def fun(x):
 jax.grad(fun)(x) # doesn't work :(
 ```
 
-The problem is that the return value is an `ntensor` with shape `{}`, which `jax.grad` doesn't know what to do with. You can fix this in two ways. First, you can convert a scalar `ntensor` to a Jax scalar using the special `[...]` syntax.:
+The problem is that the return value is an `ntensor` with shape `{}`, which `jax.grad` doesn't know what to do with. You can fix this in two ways. First, you can convert a scalar `ntensor` to a Jax scalar using the special `.numpy()` syntax.:
 
 ```python
 import jax
@@ -304,7 +304,7 @@ import numbat as nb
 x = nb.ntensor([1.,2.,3.],'i')
 def fun(x):
    out = nb.sum(x)
-   return out[...] # converts to jax scalar 
+   return out.numpy() # converts to jax scalar 
 jax.grad(fun)(x) # works!
 ```
 
