@@ -26,6 +26,7 @@ If so, you might like this package.
   * [Table of Contents](#table-of-contents)
   * [Requirements](#requirements)
   * [Installation](#installation)
+  * [Tutorials](#tutorials)
   * [Why use this instead of Jax?](#why-use-this-instead-of-jax)
     * [Example 1: Indexing](#example-1-indexing-)
     * [Example 2: Batching](#example-2-batching)
