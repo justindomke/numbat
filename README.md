@@ -79,7 +79,11 @@ This is still just a prototype. But I think it's enough to validate that the ans
 
 ### Example 1: Indexing 
 
-Say you've got some array `X` containing data from different users, at different times and with different features. You've got a few different subsets of users stored in `my_users`. For each user, there is some subset of times you care about, stored in `my_times`. For each user/subset/time combination, there's one feature you care about, stored in an array `my_feats`. So this is your situation:
+Say you've got some array `X` containing data from different users, at different times and with different features. And you've got a few different subsets of users stored in `my_users`. And for each user, there is some subset of times you care about, stored in `my_times`. And for each user/time/subset combination, there is one feature you care about, stored in `my_feats`.
+
+(To be clear: `X[u,t,f]` is the measurement of feature `f` at time `t` for user `u`, `my_users[i,k]` is user number `i` in subset number `k`, while `my_times[j,i]` is the time for time number `j` and user number `i`, and `my_feats[i,j,k]` is the feature you care about for user number `i` at time number `j` in subset number `k`.)
+
+So this is your situation:
 
 ```
 X.shape        == (n_user, n_time, n_feat)
