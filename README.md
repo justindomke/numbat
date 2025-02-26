@@ -156,10 +156,10 @@ R.shape == (n_reg,)
 And you'd like to compute some matrix `W` that contains the results of
 
 ```python
-simple_ridge(X[u,:,:], Y[u,:,p], R[k])
+simple_ridge(X[u,:,:], Y[u,:,p], R[i])
 ```
 
-for all `u`, `p`, and `k`. How to do that in NumPy?
+for all `u`, `p`, and `i`. How to do that in NumPy?
 
 Well, do you know what `numpy.linalg.solve(a, b)` does when `a` and `b` are high dimensional? The [documentation](https://numpy.org/doc/stable/reference/generated/numpy.linalg.solve.html) is rather hard to parse. The simplest solution turns out to be:
 
@@ -215,7 +215,7 @@ triple_batched_ridge_jax = \
 W = triple_batched_ridge_jax(X, Y, R)
 ```
 
-Personally, I think this *is* much better than manual batching. But it still requires you to do a lot of tedious manual tracking of axes as they flow through different operations.
+Personally, I think this *is* much better than manual batching. But it still requires a lot of tedious manual tracking of axes as they flow through different operations.
 
 So how would you do this in Numbat? Here's how:
 
@@ -354,22 +354,24 @@ You can do broadcasting in three ways:
 
 * [xarray](https://docs.xarray.dev/en/stable/index.html) and the many efforts towards integration with Jax including
 
-    * [xarray_jax](https://github.com/google-deepmind/graphcast/blob/main/graphcast/xarray_jax.py) in [graphcast](https://github.com/google-deepmind/graphcast) 
+  * [xarray_jax](https://github.com/google-deepmind/graphcast/blob/main/graphcast/xarray_jax.py) in [graphcast](https://github.com/google-deepmind/graphcast) 
 
-    * [xarray_jax](https://github.com/allen-adastra/xarray_jax) 
+  * [xarray_jax](https://github.com/allen-adastra/xarray_jax) 
 
-* [named tensors](https://pytorch.org/docs/stable/named_tensor.html) (in PyTorch)
+  * [xarray-einstats](https://github.com/arviz-devs/xarray-einstats)
 
 * [Tensor Considered Harmful](http://nlp.seas.harvard.edu/NamedTensor.html)
 
+* [named tensors](https://pytorch.org/docs/stable/named_tensor.html) (in PyTorch)
+
 * [einops](https://github.com/arogozhnikov/einops)
 
-* [xarray-einstats](https://github.com/arviz-devs/xarray-einstats)
-
 * [Nexus](https://github.com/ctongfei/nexus)  
+
+* [Named Tensor Notation](https://arxiv.org/abs/2102.13196) (for math)
 
 * [Numbat face](https://commons.wikimedia.org/wiki/File:Numbat_Face.jpg)
 
 
 
-(Please let me know about any other )
+(Please let me know about any other related packages.)
