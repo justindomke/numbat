@@ -8,11 +8,9 @@ NumPy+Jax with named axes and an uncompromising attitude
 
 Does this resonate with you? 
 
-In NumPy (and PyTorch and Jax):
- 
-* Broadcasting and batching and indexing are confusing and tedious.
+* In NumPy (and PyTorch and Jax et al.), broadcasting and batching and indexing are confusing and tedious.
 
-* Einstein summation is good.
+* Einstein summation, meanwhile, is good.
 
 * But why only Einstein *summation*? Why not Einstein *everything*?
 
@@ -86,7 +84,7 @@ my_feats.shape == (20, 5, 100)
 You want to produce an array `Z` such that for all combinations of `i`, `j`, and `k`, the following is true:
 
 ```
-Z[i,j,k] == X[my_user[i,k], my_time[j,i], my_feat[j,k,i]]
+Z[i,j,k] == X[my_users[i,k], my_times[j,i], my_feats[j,k,i]]
 ```
 
 What's the easiest way to do that in NumPy? Obviously `X[my_user, my_time, my_feat]` won't work. (Ha! Wouldn't that be nice!) In fact, the easiest answer turns out to be:
