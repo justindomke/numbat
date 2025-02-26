@@ -101,8 +101,8 @@ Here's how to do this in Numbat. First, you cast all the arrays to be named tens
 
 ```python
 import numbat as nb
-u, t, f = axes()
-x       = nb.ntensor(X,       u, t, f)
+u, t, f  = axes()
+x        = nb.ntensor(X,        u, t, f)
 ny_users = nb.ntensor(my_users, u, f)
 ny_times = nb.ntensor(my_times, t, u)
 ny_feats = nb.ntensor(my_feats, t, f, u)
