@@ -50,9 +50,15 @@ If so, you might like this package.
 
 ## Installation
 
-1. It's a single file: [`numbat.py`](https://github.com/justindomke/numbat/blob/main/numbat.py).
-2. Download it and put it in your working directory.
+1. It's a single file: [`numbat.py`](https://github.com/justindomke/numbat/blob/main/numbat.py)
+2. Download it and put it in your directory.
 3. Done.
+
+## Tutorials
+
+* [Convnet tutorial](https://github.com/justindomke/numbat/blob/main/convnet_tutorial.ipynb)
+* [Minimal API tutorial](https://github.com/justindomke/numbat/blob/main/minimal_api_tutorial.ipynb)
+* [Maximal API tutorial](https://github.com/justindomke/numbat/blob/main/maximal_api_tutorial.ipynb)
 
 ## Why use this instead of Jax?
 
@@ -242,7 +248,7 @@ If you don't want to learn a lot of features, you can (in principle) do everythi
    * To create: `A=ntensor([[1,2,3],[4,5,6]],'i','j')`
    * Use `A.shape` to get the shape (a dict), `A.axes` to get the axes (a set) and `A.ndim` to get the number of dimensions (an int).
    * Use `A(i=i_ind, j=j_ind)` to index.
-   * Use `A['j', 'i']` to convert back to a Jax array.
+   * Use `A.numpy('j', 'i')` to convert back to a regular Jax array.
    * Use `A+B`, for (batched) addition, `A*B` for multiplication, etc.
 
 2. Use `dot` to do inner/outer/matrix/tensor products or einstein summation.
@@ -260,7 +266,7 @@ If you don't want to learn a lot of features, you can (in principle) do everythi
 5. Use `lift` to wrap Jax functions to operate on `ntensor`s
    * `lift(jnp.matmul, 'i j, j k -> i k')` creates a function that uses `i` and `j` axes of the first argument and the `j` and `k` axes of the second argument.
     
-6. `grad` / `value_and_grad`: compute gradients
+6. Use `grad` and `value_and_grad` to compute gradients.
 
 ## Full API docs
 
@@ -341,7 +347,11 @@ You can do broadcasting in three ways:
 
 ## Friends
 
-* [xarray](https://docs.xarray.dev/en/stable/index.html)
+* [xarray](https://docs.xarray.dev/en/stable/index.html) and the many efforts towards integration with Jax including
+
+    * [xarray_jax](https://github.com/google-deepmind/graphcast/blob/main/graphcast/xarray_jax.py) in [graphcast](https://github.com/google-deepmind/graphcast) 
+
+    * [xarray_jax](https://github.com/allen-adastra/xarray_jax) 
 
 * [named tensors](https://pytorch.org/docs/stable/named_tensor.html) (in PyTorch)
 
@@ -354,3 +364,7 @@ You can do broadcasting in three ways:
 * [Nexus](https://github.com/ctongfei/nexus)  
 
 * [Numbat face](https://commons.wikimedia.org/wiki/File:Numbat_Face.jpg)
+
+
+
+(Please let me know about any other )
