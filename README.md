@@ -26,6 +26,8 @@ If so, you might like this package.
 * [Numbat](#numbat)
   * [Manifesto](#manifesto)
   * [Table of Contents](#table-of-contents)
+  * [Requirements](#requirements)
+  * [Installation](#installation)
   * [Why use this instead of Jax?](#why-use-this-instead-of-jax)
     * [Example 1: Indexing](#example-1-indexing-)
     * [Example 2: Batching](#example-2-batching)
@@ -35,16 +37,28 @@ If so, you might like this package.
     * [Things that work out of the box](#things-that-work-out-of-the-box)
     * [Gradient functions](#gradient-functions)
     * [Things that don't work](#things-that-dont-work)
-  * [Requirements](#requirements)
-  * [Installation](#installation)
   * [The sharp bits](#the-sharp-bits)
   * [How broadcasting works](#how-broadcasting-works)
   * [Friends](#friends)
 <!-- TOC -->
 
+## Requirements
+
+* Python 3.10+
+* Numpy
+* Jax
+* [varname](https://github.com/pwwang/python-varname) (Optional: For magical axis naming.)
+* Pandas (Optional: If you want to use `dataframe`)
+
+## Installation
+
+1. It's a single file: [`numbat.py`](https://github.com/justindomke/numbat/blob/main/numbat.py).
+2. Download it and put it in your working directory.
+3. Done.
+
 ## Why use this instead of Jax?
 
-First of all, you don't have to use it *instead*, you can use them together. Numbat is a different interface—all the real work is still done by Jax. You can start by using Numbat *inside* your existing Jax code, in whatever spots that makes thigns easier. All the standard Jax features still work (GPUs, JIT compilation, gradients, etc.) and interoperate smoothly.
+First of all, you don't have to use it *instead*, you can use them together. Numbat is a different interface—all the real work is still done by Jax. You can start by using Numbat *inside* your existing Jax code, in whatever spots that makes things easier. All the standard Jax features still work (GPUs, JIT compilation, gradients, etc.) and interoperate smoothly.
 
 OK, but *when* would Numbat make things easier?  Well, in NumPy (and Jax and PyTorch), easy things are already easy, and Numbat will not help. But hard things are often *really* hard, because:
 
@@ -52,7 +66,7 @@ OK, but *when* would Numbat make things easier?  Well, in NumPy (and Jax and PyT
 * Broadcasting gets insanely complicated and tedious.
 * Writing "batched" code gets insanely complicated and tedious.
 
-Ultimately, these all stem from the same issue: Numpy indexes different axes by *position*. This leads to constant, endless fiddling to the axes of different arrays to align with each other. It also means that different library functions all have their own (varying, and often poorly documented) conventions on where the different axes are supposed to go and what happens when arrays of different numbers of dimensions are provided.
+Ultimately, these all stem from the same issue: Numpy indexes different axes by *position*. This leads to constant, endless fiddling to get the axes of different arrays to align with each other. It also means that different library functions all have their own (varying, and often poorly documented) conventions on where the different axes are supposed to go and what happens when arrays of different numbers of dimensions are provided.
 
 Numbat is an experiment. What if axes didn't *have* positions, but only *names*? Sure, the bits have to be laid out in some order, but why make the user think about that? Following [many previous projects](#friends), let's define the shape to be a *dictionary* that maps names to ints. But what if we're totally uncompromising and *only* allow indexing using names? And what if we redesign indexing and broadcasting and batching around that representation? Does something nice happen?
 
@@ -307,20 +321,6 @@ nb.grad(fun)(x) # works!
 ### Things that don't work
 
 `jax.vmap` does not work. This is impossible since `jax.vmap` is all based on the positions of axes. Use `numbat.vmap` or `numbat.batch` instead.
-
-## Requirements
-
-* Python 3.10+
-* Numpy
-* Jax
-* [varname](https://github.com/pwwang/python-varname) (Optional: For magical axis naming.)
-* Pandas (Optional: If you want to use `dataframe`)
-
-## Installation
-
-1. It's a single file.
-2. Download it and put it in your working directory.
-3. Done.
 
 ## The sharp bits
 
