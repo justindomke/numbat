@@ -480,10 +480,19 @@ def other_axes(axes, *args):
         return axes
     out = []
     for ar in leaves:
-        for ax in ar.axes:
-            if ax not in out and ax not in axes:
-                out.append(ax)
+        if isinstance(ar, ntensor):
+            for ax in ar.axes:
+                if ax not in out and ax not in axes:
+                    out.append(ax)
     return tuple(out)
+
+def ravel_pytree(pytree,axis):
+    "Like jax.flatten_util.ravel_pytree, but gives an ntensor"
+
+    import jax.flatten_util
+    axis = Axis(axis)
+    w, unflatten = jax.flatten_util.ravel_pytree(pytree)
+    return ntensor(w,axis), lambda v: unflatten(v.numpy(axis))
 
 # The fundamental classes ####################################################################################
 
@@ -766,16 +775,43 @@ class ntensor:
         #     self.__jax_array__ = lambda: self._data
         #     self.dtype = self._data.dtype
 
-    def __jax_array__(self):
-        if self.ndim > 1:
-            raise ValueError("Only ntensor with <= 1 can be auto-converted to jax array")
-        return self._data
+        # if self._data.ndim <= 1:
+        #     def array(obj):
+        #         print(f"array {obj=}")
+        #         return
+        #
+        #     def __array_namespace__(self, version):
+        #        return {'array':  array}
 
-    def __array__(self, dtype=None):
-        if self.ndim > 1:
-            raise ValueError("Only ntensor with <= 1 can be auto-converted to array")
-        print(f"__array__ {self=} {dtype=}")
-        return onp.asarray(self._data, dtype=dtype)
+
+
+    def __array_namespace__(self, array_namespace):
+        class MyNamespace:
+            @staticmethod
+            def __array__(self, *inputs, **kwargs):
+                print("__array__ called")
+
+            @staticmethod
+            def array(self, *inputs, **kwargs):
+                print("array called")
+
+            @staticmethod
+            def __array_ufunc__(self, *inputs, **kwargs):
+                print("__array_unfunc__ called")
+
+        return MyNamespace
+
+
+    # def __jax_array__(self):
+    #     if self.ndim > 1:
+    #         raise ValueError("Only ntensor with <= 1 can be auto-converted to jax array")
+    #     return self._data
+    #
+    # def __array__(self, dtype=None):
+    #     if self.ndim > 1:
+    #         raise ValueError("Only ntensor with <= 1 can be auto-converted to array")
+    #     print(f"__array__ {self=} {dtype=}")
+    #     return onp.asarray(self._data, dtype=dtype)
 
     @property
     def dtype(self):
@@ -1270,6 +1306,15 @@ class ntensor:
                 f"Can't compare NTensor with shape {self.shape} to other with shape {other.shape}")
         return equal(self, other)
 
+    def __int__(self):
+        if self.shape != {}:
+            raise ValueError(f"Only scalar ntensor can be converted to int (got shape {self.shape})")
+        return int(self._data)
+
+    def __float__(self):
+        if self.shape != {}:
+            raise ValueError(f"Only scalar ntensor can be converted to int (got shape {self.shape})")
+        return float(self._data)
 
 
 AxisIndices = ntensor | slice | int | Sequence[int] | ArrayLike | IndexedAxis
@@ -1478,6 +1523,14 @@ def random_normal(key):
         raise ValueError("only 1D arrays are supported")
     return ntensor(jax.random.normal(key.numpy()))
 
+def random_categorical(key, logits):
+    if key.ndim != 1:
+        raise ValueError("only 1D arrays are supported")
+    if logits.ndim != 1:
+        raise ValueError("only 1D arrays are supported")
+    return ntensor(jax.random.categorical(key.numpy(), logits.numpy()))
+
+
 # Mangling arrays # ##########################################################################################
 
 def concatenate(arrays: Sequence[ntensor], axis:str|Axis) -> ntensor:
@@ -1573,8 +1626,8 @@ def stack(arrays: Iterable[ntensor], axis:str|Axis) -> ntensor:
 # Lifting  #########################################################################################
 
 
-def parse_lift_str(axes_str, in_axes, out_axes):
-    """Parse a lift string
+def parse_lift_str(axes_str:str|None, in_axes, out_axes):
+    """Parse a lift string. Use '_' to get None.
 
     Parameters
     ----------
@@ -1593,6 +1646,8 @@ def parse_lift_str(axes_str, in_axes, out_axes):
     if axes_str is None and in_axes is None and out_axes is None:
         return [], []
     elif axes_str is None:
+        in_axes = jax.tree.map(Axis, in_axes)
+        out_axes = jax.tree.map(Axis, out_axes)
         return in_axes, out_axes
 
     if '->' not in axes_str:
@@ -1601,7 +1656,11 @@ def parse_lift_str(axes_str, in_axes, out_axes):
     lhs, rhs = axes_str.split('->')
 
     def get_ax_tuple(part):
-        return tuple(Axis(ax) for ax in part.split())
+        parts = part.split()
+        if parts == ['_']:
+            return None
+        else:
+            return tuple(None if ax == '_' else Axis(ax) for ax in part.split())
 
     def my_split(stuff):
         if ',' in stuff:
@@ -1648,10 +1707,12 @@ def lift_pytree(fun: Callable, in_axes=(), out_axes=()) -> Callable:
         def my_ntensor(out_axes, numpy_out):
             return ntensor(numpy_out, *out_axes)
 
+        print(f"{out=}")
+        print(f"{out_axes=}")
+
         return tree_map_axes(my_ntensor, out_axes, out)
 
     return wrapped
-
 
 def lift(jax_fun: Callable, axes_str: str | None = None, in_axes=None, out_axes=None,
          batched=True) -> Callable:
@@ -1661,7 +1722,7 @@ def lift(jax_fun: Callable, axes_str: str | None = None, in_axes=None, out_axes=
         if is_sequence_of_type(in_axes, Axis):
             axes = set(in_axes)
         else:
-            axes = set.union(*[set(in_ax) for in_ax in in_axes])
+            axes = set.union(*[set(in_ax) for in_ax in in_axes if in_ax is not None])
         return batch(fun, axes)
     else:
         return fun
@@ -2130,7 +2191,7 @@ def batch(fun: Callable, axes: Iterable[AxisLike] = frozenset(), other:None|Iter
 
     def wrapped(*args):
         #args = [convert_to_0dim_array_if_possible(arg) for arg in args]
-        args = jax.tree.map(convert_to_0dim_array_if_possible, args, is_leaf=is_ntensor)
+        #args = jax.tree.map(convert_to_0dim_array_if_possible, args, is_leaf=is_ntensor)
 
         vmap_axes = other_axes(axes, *args)
 
@@ -2778,6 +2839,17 @@ var = wrap_jax_reduction(jnp.var)
 Call with `axes` to reduce or `vmap_axes` to *not* reduce."""
 
 
+# # Expansions #######################################################################################
+#
+# def wrap_jax_expansion(jax_fun):
+#     def new_fun(arg: ntensor, ax: str|Axis):
+#         assert isinstance(arg, ntensor)
+#         assert arg.axes == {}
+#         ax = Axis(ax)
+#         return ntensor(jax_fun(arg._data))
+#
+#     return wrap(new_fun, kwargs=False)
+
 # Gradients ########################################################################################
 
 def grad(fun, argnums=0):
@@ -3025,5 +3097,3 @@ def dataframe(A: ntensor, label:str, *axis_arrays):
     columns = [label] + [axis._name for axis in axes]
     df = pd.DataFrame({col:d for col, d in zip(columns, data)})
     return df
-
-

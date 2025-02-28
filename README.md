@@ -131,7 +131,7 @@ Say that along with `X`, we have some outputs `Y`. For each user and each time, 
 
 To do this for a single user with a single output and a single regularization constant, remember the [standard formula](https://en.wikipedia.org/wiki/Ridge_regression) that
 
-$w = (X^\top X + rI)^{-1} X^\top y$:
+$w = (X^\top X + rI)^{-1} X^\top y$.
 
 In this simple case, the code is a straightforward translation:
 
@@ -197,7 +197,7 @@ W = triple_batched_ridge_jax(X, Y, R)
 
 Simple enough, right? 🫡
 
-Maybe. It's also completely wrong. The outermost `vmap` absorbs the first dimension of `Y`, so in the innermost `vmap`, `p` is found in dimension `1`, not dimension `2`. (It's almost like referring to axes by position is confusing!) You also need to mess around with `out_axes` if you want to reproduce the layout of the manually batched function.
+Maybe. It's also completely wrong. The middle `vmap` absorbs the first dimension of `Y`, so in the innermost `vmap`, `p` is found in dimension `1`, not dimension `2`. (It's almost like referring to axes by position is confusing!) You also need to mess around with `out_axes` if you want to reproduce the layout of the manually batched function.
 
 So what you actually want is this:
 
@@ -239,37 +239,39 @@ And the `out_axes` says that it should return:
 
 1. A 1D array with axis `f`.
 
-When `fun` is finally called, the inputs `x`, `y` and `r` all have named dimensions, so it knows exactly what it needs to do: It should operate on the `t` and `f` axes of `x` and the `t` axis of `y`, and broadcast over everything else. And it should place the output along the `f` axis. 
+When `fun` is finally called, the inputs `x`, `y` and `r` all have named dimensions, so it knows exactly what it needs to do: It should operate on the `t` and `f` axes of `x` and the `t` axis of `y` and place the output along the `f` axis. Then it should broadcast over all other input dimensions.
 
 And where does `simple_ridge(X[u,:,:],Y[u,:,p],R[i])` end up? Well, it's in the only place it could be: `w(u=u, p=p, r=i)`.
 
-(If you find the `lift` syntax clunky, you could write `fun  = nb.lift(simple_ridge, 't f, t, -> f')` instead.)
+The above `lift` syntax is a bit clunky. If you prefer, you could write `fun=nb.lift(simple_ridge, 't f, t, -> f')` instead. This is completely equivalent.
 
 ## Minimal API
 
 If you don't want to learn a lot of features, you can (in principle) do everything with Numbat just using a few functions.
 
 1. Use `ntensor` to create named tensors 
-   * To create: `A=ntensor([[1,2,3],[4,5,6]],'i','j')`
-   * Use `A.shape` to get the shape (a dict), `A.axes` to get the axes (a set) and `A.ndim` to get the number of dimensions (an int).
-   * Use `A(i=i_ind, j=j_ind)` to index.
+   * Use `A=ntensor([[1,2,3],[4,5,6]],'i','j')` to create.
+   * Use `A+B`, for (batched/broadcast) addition, `A*B` for multiplication, etc.
+   * Use `A.shape` to get the shape (a dict)
+   * Use `A.axes` to get the axes (a set)
+   * Use `A.ndim` to get the number of dimensions (an int).
+   * Use `A(i=i_ind, j=j_ind)` to index.  (*Don't* use `A[i_ind, j_ind]`.) 
    * Use `A.numpy('j', 'i')` to convert back to a regular Jax array.
-   * Use `A+B`, for (batched) addition, `A*B` for multiplication, etc.
 
 2. Use `dot` to do inner/outer/matrix/tensor products or einstein summation.
-   * Use `dot(A,B,C,D)` to sum along all shared axes.
-   * * Order doesn't matter!
+   * Use `dot(A,B,C,D)` to sum along all shared axes. The order of the arguments does not matter!
    * Use `dot(A,B,C,D,keep={'i','j'})` to preserve some shared axes.
    * `A @ B` is equivalent to `dot(A,B)`.
 
 3. Use `batch` to create a batched function
-   * Use `batch(fun, {'i', 'j'})(A, B)` to `fun` to the axes `i` and `j` of `A` and `B`, broadcasting over all other axes.
+   * Use `batch(fun, {'i', 'j'})(A, B)` to `fun` to the axes `i` and `j` of `A` and `B`, broadcasting/batching over all other axes.
 
 4. Use `vmap` to create a vmapped function.
-    * `vmap(fun, {'i', 'j'})(A, B)` applies `fun` to all axes that exist in either `A` or `B` *except* `i` and `j`, broadcasting over `i` and `j`.
+    * `vmap(fun, {'i', 'j'})(A, B)` applies `fun` to all axes that exist in either `A` or `B` *except* `i` and `j`, broadcasting/batching over `i` and `j`.
 
-5. Use `lift` to wrap Jax functions to operate on `ntensor`s
-   * `lift(jnp.matmul, 'i j, j k -> i k')` creates a function that uses `i` and `j` axes of the first argument and the `j` and `k` axes of the second argument.
+5. Use `lift` to wrap Jax functions to operate on `ntensor`s instead of Jax/NumPy arrays.
+   * Use `fun = lift(jnp.matmul, 'i j, j k -> i k')` creates a function that uses `i` and `j` axes of the first argument and the `j` and `k` axes of the second argument.
+   * Then, `fun(A,B)` is like `ntensor(jnp.matmul(A.numpy(i,j), B.numpy(j,k)),i,k)`, except it automatically broadcasts/vmaps over all input dimensions other than `i`, `j`, and `k`.
     
 6. Use `grad` and `value_and_grad` to compute gradients.
 
