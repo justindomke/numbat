@@ -279,17 +279,21 @@ import jax
 from jax import numpy as jnp
 import numpy as onp
 from numpy.typing import ArrayLike
-from typing import Set, Iterable, Sequence, Callable, Tuple, Union, Dict, Self, Type
+from typing import (Set, Iterable, Sequence, Callable, Tuple, Union, Dict, Self, Type, ParamSpec, TypeVar,
+                    Concatenate, Any)
 from collections import abc
 import builtins
 from numbers import Number
+P = ParamSpec("P")
+T = TypeVar("T")
+
 
 _fundamental_stuff = ['Axis', 'ntensor']
 _qol_stuff = ['axes', 'allclose']
 _creation_stuff = ['ones', 'zeros', 'randn']
 _batching_stuff = ['vmap', 'batch', 'wrap', 'scan']
 _lifting_and_lowering_stuff = ['lift', 'lower']
-_manipulation_stuff = ['concatenate','stack']
+_manipulation_stuff = ['concatenate', 'stack']
 
 _elementwise_stuff = ['abs', 'acos', 'acosh', 'arccos', 'arccosh', 'arcsin', 'arcsinh', 'arctan', 'arctanh',
                       'asin', 'asinh', 'atan', 'atanh', 'ceil', 'conj', 'cos', 'cosh', 'deg2rad', 'exp',
@@ -303,11 +307,11 @@ _pairwise_stuff = ['add', 'arctan2', 'atan2', 'divide', 'divmod', 'equal', 'floo
                    'polyadd', 'polymul', 'polysub', 'polyval', 'pow', 'power', 'remainder', 'subtract',
                    'true_divide']
 
-_linalg_stuff = ['solve','inv']
+_linalg_stuff = ['solve', 'inv']
 
-_gradient_stuff = ['grad','value_and_grad']
+_gradient_stuff = ['grad', 'value_and_grad']
 
-_reductions_stuff = ['all', 'any', 'logsumexp', 'max', 'mean', 'median', 'min',  'prod', 'sum', 'std', 'var']
+_reductions_stuff = ['all', 'any', 'logsumexp', 'max', 'mean', 'median', 'min', 'prod', 'sum', 'std', 'var']
 
 _other_stuff = ['dot']
 
@@ -414,8 +418,18 @@ class ConsistentDict(dict):
         super().__setitem__(key, value)
 
 
+class AxesSet(frozenset):
+    """An AxesSet is exactly like a frozenset, except it compares as equal to {}"""
+
+    def __eq__(self, other):
+        if other == {}:
+            return self == set()
+        else:
+            return frozenset.__eq__(self, other)
+
+
 def is_set_of_type(obj: object, typ: Type | Sequence[Type], len_zero_ok=True) -> bool:
-    if isinstance(obj, (Set,frozenset)):
+    if isinstance(obj, (Set, frozenset)):
         if len_zero_ok:
             return builtins.all(isinstance(item, typ) for item in obj)
         else:
@@ -474,6 +488,7 @@ def ensure_ntensor(x):
 def ensure_ntensor_tree(x):
     return jax.tree.map(ensure_ntensor, x, is_leaf=is_ntensor)
 
+
 def other_axes(axes, *args):
     leaves = jax.tree.leaves(args, is_leaf=is_ntensor)
     if len(leaves) == 0:
@@ -486,13 +501,15 @@ def other_axes(axes, *args):
                     out.append(ax)
     return tuple(out)
 
-def ravel_pytree(pytree,axis):
+
+def ravel_pytree(pytree, axis):
     "Like jax.flatten_util.ravel_pytree, but gives an ntensor"
 
     import jax.flatten_util
     axis = Axis(axis)
     w, unflatten = jax.flatten_util.ravel_pytree(pytree)
-    return ntensor(w,axis), lambda v: unflatten(v.numpy(axis))
+    return ntensor(w, axis), lambda v: unflatten(v.numpy(axis))
+
 
 # The fundamental classes ####################################################################################
 
@@ -758,7 +775,7 @@ class ntensor:
         if len(set(axes)) != len(axes):
             raise ValueError(f"ntensor got non-unique axes {axes}")
 
-        #print(f"about to create data with array {data=}")
+        # print(f"about to create data with array {data=}")
         self._data = jnp.array(data)
 
         if self._data.ndim != len(axes):
@@ -768,7 +785,7 @@ class ntensor:
 
         self._axes_ordered = axes
 
-        #self._shape = ShapeDict({axes[i]: self._data.shape[i] for i in range(len(axes))})
+        # self._shape = ShapeDict({axes[i]: self._data.shape[i] for i in range(len(axes))})
 
         # # hack to make jax.grad work for scalars
         # if self._data.ndim == 0:
@@ -782,8 +799,6 @@ class ntensor:
         #
         #     def __array_namespace__(self, version):
         #        return {'array':  array}
-
-
 
     def __array_namespace__(self, array_namespace):
         class MyNamespace:
@@ -800,7 +815,6 @@ class ntensor:
                 print("__array_unfunc__ called")
 
         return MyNamespace
-
 
     # def __jax_array__(self):
     #     if self.ndim > 1:
@@ -830,7 +844,8 @@ class ntensor:
         >>> A.axes == {'day', 'person'}
         True
         """
-        return frozenset(self._axes_ordered)
+        # return frozenset(self._axes_ordered)
+        return AxesSet(self._axes_ordered)
 
     # @property
     # def _axes_ordered(self) -> Tuple[Axis, ...]:
@@ -923,7 +938,6 @@ class ntensor:
         if strict and len(axes) != self.ndim:
             raise ValueError(f"{len(axes)=} not equal to {self.ndim=}")
 
-
         extra_dims = len(set(axes) - self.axes)
         data = self._data.reshape(self._data.shape + (1,) * extra_dims)
         where = []
@@ -987,7 +1001,6 @@ class ntensor:
         if set(axes) != self.axes:
             raise ValueError(f"Provided axes {axes} do not match ntensor axes {self.axes}")
 
-
         extra_dims = len(set(axes) - self.axes)
         data = self._data.reshape(self._data.shape + (1,) * extra_dims)
         where = []
@@ -1000,8 +1013,6 @@ class ntensor:
                 where_extra = where_extra + 1
 
         return data.transpose(where)
-
-
 
     # def __getitem__(self, idx):
     #     if isinstance(idx, slice):
@@ -1293,7 +1304,10 @@ class ntensor:
         """
         return select(self, **kwargs)
 
-    def __lshift__(self, other: Iterable[str | Axis]) -> 'ntensor':
+    def __lshift__(self, other: dict | Iterable[str | Axis]) -> 'ntensor':
+        """
+        Fast notation to check that ntensor has given axes
+        """
         other = {Axis(o) for o in other}
         assert self.axes == other, f"{self.axes} != {other}"
         return self
@@ -1335,13 +1349,14 @@ def ntensor_unflatten(aux_data, children):
     # Do unflattening without calling ntensor.__init__ to avoid issues discussed here:
     # https://docs.jax.dev/en/latest/working-with-pytrees.html
     # in "Custom pytrees and initialization with unexpected values" section
-    #print(f"unflattening {aux_data=} {children=}")
+    # print(f"unflattening {aux_data=} {children=}")
     data, = children
     axes_ordered, = aux_data
     obj = object.__new__(ntensor)
     obj._data = data
     obj._axes_ordered = axes_ordered
     return obj
+
 
 # Global registration
 jax.tree_util.register_pytree_node(ntensor, ntensor_flatten, ntensor_unflatten)
@@ -1363,7 +1378,6 @@ jax.tree_util.register_pytree_node(ntensor, ntensor_flatten, ntensor_unflatten)
 # # Global registration
 # jax.tree_util.register_pytree_node(ntensor, ntensor_flatten, ntensor_unflatten)
 #
-
 
 
 # Various quality of life improvements #############################################################
@@ -1403,7 +1417,7 @@ def axes(*names: str):
     if names == ():
         import varname
         names = varname.varname(multi_vars=True)
-        if len(names)==1:
+        if len(names) == 1:
             return Axis(names[0])
         else:
             return tuple(Axis(name) for name in names)
@@ -1452,15 +1466,17 @@ def ones(dtype=None, **axes: int) -> ntensor:
     >>> print(B.shape)
     {cats:5, dogs:15}
     """
-    data = jnp.ones([axes[i] for i in axes],dtype=dtype)
+    data = jnp.ones([axes[i] for i in axes], dtype=dtype)
     return ntensor(data, *axes)
+
 
 def ones_like(A: ntensor, dtype=None) -> ntensor:
     if dtype is None:
         dtype = A.dtype
 
-    str_shape = {str(ax):A.shape[ax] for ax in A._axes_ordered}
+    str_shape = {str(ax): A.shape[ax] for ax in A._axes_ordered}
     return ones(dtype=dtype, **str_shape)
+
 
 def zeros(**axes: int) -> ntensor:
     """Convenience function, over just using `np.zeros` and then `array`. Use just like `ones`
@@ -1468,6 +1484,7 @@ def zeros(**axes: int) -> ntensor:
 
     data = jnp.zeros([axes[i] for i in axes])
     return ntensor(data, *axes)
+
 
 def randn(**kwargs: int):
     """Convenience function, to call `np.random.randn` and then `ntensor`. Use just like
@@ -1494,46 +1511,10 @@ def randn(**kwargs: int):
     axes = [Axis(i) for i in kwargs]
     return ntensor(onp.random.randn(*sizes), *axes)
 
-# Random key management ######################################################################################
-
-def PRNGKey(seed:int, axis:str|Axis):
-    return ntensor(jax.random.PRNGKey(seed), axis)
-
-def random_split(key, n=None, new_axis=None):
-    assert key.ndim == 1
-    old_axis, = key.axes
-    jax_key = key.numpy_broadcasted(old_axis)
-
-    if n is None and new_axis is None:
-        jax_a, jax_b = jax.random.split(jax_key)
-        return ntensor(jax_a, old_axis), ntensor(jax_b, old_axis)
-    elif n and new_axis:
-        jax_keys = jax.random.split(jax_key, n)
-        return ntensor(jax_keys, new_axis, old_axis)
-    else:
-        raise ValueError("either both n and new_axis must be none or both specified")
-
-def random_int(key, minval, maxval):
-    if key.ndim != 1:
-        raise ValueError("only 1D arrays are supported")
-    return ntensor(jax.random.randint(key.numpy(), shape=(), minval=minval, maxval=maxval))
-
-def random_normal(key):
-    if key.ndim != 1:
-        raise ValueError("only 1D arrays are supported")
-    return ntensor(jax.random.normal(key.numpy()))
-
-def random_categorical(key, logits):
-    if key.ndim != 1:
-        raise ValueError("only 1D arrays are supported")
-    if logits.ndim != 1:
-        raise ValueError("only 1D arrays are supported")
-    return ntensor(jax.random.categorical(key.numpy(), logits.numpy()))
-
 
 # Mangling arrays # ##########################################################################################
 
-def concatenate(arrays: Sequence[ntensor], axis:str|Axis) -> ntensor:
+def concatenate(arrays: Sequence[ntensor], axis: str | Axis) -> ntensor:
     """Concatenate a sequence of NTensors into a NTensor.
 
     Parameters
@@ -1577,7 +1558,8 @@ def concatenate(arrays: Sequence[ntensor], axis:str|Axis) -> ntensor:
     axis = Axis(axis)
     return lift(jnp.concatenate, in_axes=[axis], out_axes=[axis])(arrays)
 
-def stack(arrays: Iterable[ntensor], axis:str|Axis) -> ntensor:
+
+def stack(arrays: Iterable[ntensor], axis: str | Axis) -> ntensor:
     """Join a squence of ntensor along a new axis into a new ntensor.
 
     Parameters
@@ -1626,7 +1608,7 @@ def stack(arrays: Iterable[ntensor], axis:str|Axis) -> ntensor:
 # Lifting  #########################################################################################
 
 
-def parse_lift_str(axes_str:str|None, in_axes, out_axes):
+def parse_lift_str(axes_str: str | None, in_axes, out_axes):
     """Parse a lift string. Use '_' to get None.
 
     Parameters
@@ -1692,7 +1674,7 @@ def lift_pytree(fun: Callable, in_axes=(), out_axes=()) -> Callable:
     """
 
     def wrapped(*ntensor_args):
-        #ntensor_args = ensure_ntensor_tree(ntensor_args)
+        # ntensor_args = ensure_ntensor_tree(ntensor_args)
 
         def my_array(in_axes, arg):
             if in_axes is None:
@@ -1707,12 +1689,10 @@ def lift_pytree(fun: Callable, in_axes=(), out_axes=()) -> Callable:
         def my_ntensor(out_axes, numpy_out):
             return ntensor(numpy_out, *out_axes)
 
-        print(f"{out=}")
-        print(f"{out_axes=}")
-
         return tree_map_axes(my_ntensor, out_axes, out)
 
     return wrapped
+
 
 def lift(jax_fun: Callable, axes_str: str | None = None, in_axes=None, out_axes=None,
          batched=True) -> Callable:
@@ -1726,6 +1706,7 @@ def lift(jax_fun: Callable, axes_str: str | None = None, in_axes=None, out_axes=
         return batch(fun, axes)
     else:
         return fun
+
 
 # def abstract_lift(jax_fun, in_ints:Tuple[Tuple[int]], out_ints:Tuple[Tuple[int]])->Callable:
 #     def fun(*args):
@@ -1844,7 +1825,7 @@ def get_remaining_axes(*arrays: ntensor, keep: abc.Set[str | Axis] = frozenset()
     (Axis('i'), Axis('j'), Axis('k'))
     """
     ax_counts = count_axes(*arrays)
-    #print(f"{ax_counts=}")
+    # print(f"{ax_counts=}")
     remaining_axes = []
     for ar in arrays:
         for ax in ar._axes_ordered:
@@ -2003,6 +1984,7 @@ def prepare_args(args, in_axis):
 
     return example_args, numpy_args, in_axes, numpy_in_axes
 
+
 def vmap_eval(fun: Callable, args: Tuple, in_axis: AxisLike):
     """
     Here's one very solid concept. You can define `vmap_eval(fun, [A_1, ..., A_N], [ax_1, ...,
@@ -2042,10 +2024,10 @@ def vmap_eval(fun: Callable, args: Tuple, in_axis: AxisLike):
 
     # TODO: tolerate non-ntensor inputs
 
-    #args = ensure_ntensor_tree(args)
+    # args = ensure_ntensor_tree(args)
     in_axis = Axis(in_axis)
 
-    #args_treedef = jax.tree.structure(args, is_leaf=is_ntensor)
+    # args_treedef = jax.tree.structure(args, is_leaf=is_ntensor)
     args_flat = jax.tree.leaves(args, is_leaf=is_ntensor)
 
     if not builtins.any(in_axis in arg.axes for arg in args_flat if isinstance(arg, ntensor)):
@@ -2055,7 +2037,7 @@ def vmap_eval(fun: Callable, args: Tuple, in_axis: AxisLike):
     example_args, numpy_args, in_axes, numpy_in_axes = prepare_args(args, in_axis)
 
     def convert1(a):
-        if isinstance(a,ntensor):
+        if isinstance(a, ntensor):
             return a
         else:
             b = jnp.array(a)
@@ -2085,8 +2067,8 @@ def vmap_eval(fun: Callable, args: Tuple, in_axis: AxisLike):
     return out
 
 
-def vmap(fun: Callable, in_axes: AxisLike | Iterable[AxisLike] = frozenset(), other: None|Iterable[
-    AxisLike]=None) -> (
+def vmap(fun: Callable, in_axes: AxisLike | Iterable[AxisLike] = frozenset(), other: None | Iterable[
+    AxisLike] = None) -> (
         Callable):
     """Implements almost all of vmap. The only difference here is that for simplicity we require
     that in_axes and out_ax are provided in the wrapper call.
@@ -2146,7 +2128,7 @@ def vmap(fun: Callable, in_axes: AxisLike | Iterable[AxisLike] = frozenset(), ot
 
     flat_in_axes = tuple(in_axes)
 
-    #print(f"vmap called: {in_axes=}")
+    # print(f"vmap called: {in_axes=}")
 
     def wrapped(*args):
 
@@ -2167,7 +2149,8 @@ def vmap(fun: Callable, in_axes: AxisLike | Iterable[AxisLike] = frozenset(), ot
 
     return wrapped
 
-def batch(fun: Callable, axes: Iterable[AxisLike] = frozenset(), other:None|Iterable[AxisLike]=None) -> (
+
+def batch(fun: Callable, axes: Iterable[AxisLike] = frozenset(), other: None | Iterable[AxisLike] = None) -> (
         Callable):
     """
     Create a batched version of a function
@@ -2190,22 +2173,22 @@ def batch(fun: Callable, axes: Iterable[AxisLike] = frozenset(), other:None|Iter
     axes = tuple(Axis(ax) for ax in axes)
 
     def wrapped(*args):
-        #args = [convert_to_0dim_array_if_possible(arg) for arg in args]
-        #args = jax.tree.map(convert_to_0dim_array_if_possible, args, is_leaf=is_ntensor)
+        # args = [convert_to_0dim_array_if_possible(arg) for arg in args]
+        # args = jax.tree.map(convert_to_0dim_array_if_possible, args, is_leaf=is_ntensor)
 
         vmap_axes = other_axes(axes, *args)
 
         return vmap(fun, vmap_axes, axes)(*args)
-
 
     return wrapped
 
 
 def get_common_axes(args):
     common_axes = frozenset.intersection(*[arg.axes for arg in jax.tree.leaves(args, is_leaf=is_ntensor)])
-    return tuple(ax for ax in args[0].axes if ax in common_axes) # preserve original order
+    return tuple(ax for ax in args[0].axes if ax in common_axes)  # preserve original order
 
-def wrap(fun: Callable, kwargs=True) -> Callable:
+
+def wrap(fun: Callable[P, T]):
     """Wrap a function so it can LATER be batched or vmapped by providing `axes` or `vmap_axes`
     arguments.
 
@@ -2219,35 +2202,19 @@ def wrap(fun: Callable, kwargs=True) -> Callable:
 
     vmap_fun = vmap  # gets shadowed below
 
-    if kwargs:
-        def wrapped(*args, axes=None, vmap=None, **kwargs):
-            args = ensure_ntensor_tree(args)
-            axes = convert_empty_dict(axes)
-            vmap = convert_empty_dict(vmap)
+    def wrapped(*args: P.args, axes=None, vmap=None, **kwargs: P.kwargs)->T:
+        axes = convert_empty_dict(axes)
+        vmap = convert_empty_dict(vmap)
 
-            fun_with_kwargs = lambda *args: fun(*args, **kwargs)
+        fun_with_kwargs = lambda *args: fun(*args, **kwargs)
 
-            if axes is None and vmap is None:
-                return fun_with_kwargs(*args)
-            elif vmap is not None:
-                return vmap_fun(fun_with_kwargs, vmap, other=axes)(*args)
-            else:
-                assert axes is not None
-                return batch(fun_with_kwargs, axes)(*args)
-    else:
-        def wrapped(*args, axes=None, vmap=None):
-            args = ensure_ntensor_tree(args)
-            axes = convert_empty_dict(axes)
-            vmap = convert_empty_dict(vmap)
-
-            if axes is None and vmap is None:
-                return fun(*args)
-            elif vmap is not None:
-                return vmap_fun(fun, vmap, other=axes)(*args)
-            else:
-                assert axes is not None
-                return batch(fun, axes)(*args)
-
+        if axes is None and vmap is None:
+            return fun_with_kwargs(*args)
+        elif vmap is not None:
+            return vmap_fun(fun_with_kwargs, vmap, other=axes)(*args)
+        else:
+            assert axes is not None
+            return batch(fun_with_kwargs, axes)(*args)
     return wrapped
 
 
@@ -2282,6 +2249,7 @@ def scan(fun, init, xs, in_axis):
         numpy_ys, example_y)
 
     return carry, ys
+
 
 # Indexing #########################################################################################
 
@@ -2630,7 +2598,7 @@ def wrap_jax_elementwise(jax_fun: Callable) -> Callable:
     #     assert isinstance(arg, ntensor)
     #     return ntensor(jax_fun(arg._data), *arg._axes_ordered)
 
-    #return batch_wrap(new_fun)
+    # return batch_wrap(new_fun)
 
     return lift(jax_fun)
 
@@ -2720,7 +2688,6 @@ trunc = wrap_jax_elementwise(jnp.trunc)
 relu = wrap_jax_elementwise(jax.nn.relu)
 "Elementwise operation (see same operation in [`jax.nn`](https://docs.jax.dev/en/latest/jax.nn.html))"
 
-
 # Pairwise functions ###############################################################################
 
 wrap_jax_pairwise = lift
@@ -2802,7 +2769,8 @@ def wrap_jax_reduction(jax_fun):
         assert isinstance(arg, ntensor)
         return ntensor(jax_fun(arg._data))
 
-    return wrap(new_fun, kwargs=False)
+    return wrap(new_fun)
+
 
 any = wrap_jax_reduction(jnp.any)
 """Wraps [`jax.numpy.any`](https://docs.jax.dev/en/latest/_autosummary/jax.numpy.any.html). Call 
@@ -2837,6 +2805,16 @@ Call with `axes` to reduce or `vmap_axes` to *not* reduce."""
 var = wrap_jax_reduction(jnp.var)
 """Wraps [`jax.numpy.var`](https://docs.jax.dev/en/latest/_autosummary/jax.numpy.var.html). 
 Call with `axes` to reduce or `vmap_axes` to *not* reduce."""
+
+
+# Other wraps #######################################################################################
+
+@wrap
+def softmax(x: ntensor):
+    """Computes softmax. By default, computes softmax over all axes."""
+    data = x._data
+    axis = tuple(range(data.ndim))
+    return ntensor(jax.nn.softmax(x._data, axis=axis), *x._axes_ordered)
 
 
 # # Expansions #######################################################################################
@@ -3001,6 +2979,7 @@ def inv(a: ntensor) -> ntensor:
     b_jax = jnp.linalg.inv(a._data)
     return ntensor(b_jax, *reversed(a._axes_ordered))
 
+
 def conv_1d(a: ntensor, b: ntensor) -> ntensor:
     # axis = Axis(Axis)
 
@@ -3031,9 +3010,10 @@ def convolve(a: ntensor, b: ntensor, mode='full') -> ntensor:
 
     return ntensor(jax.scipy.signal.convolve(a.numpy(*axes), b.numpy(*axes), mode=mode), *axes)
 
+
 # Dataframe ##################################################################################################
 
-def dataframe(A: ntensor, label:str, *axis_arrays):
+def dataframe(A: ntensor, label: str, *axis_arrays):
     """Convert ntensor to dataframe
 
     Parameters
@@ -3091,9 +3071,129 @@ def dataframe(A: ntensor, label:str, *axis_arrays):
     assert set(axes) == A.axes
 
     # broadcast axis_arrays to full size
-    axis_arrays = [axis_array*ones_like(A, dtype=axis_array.dtype) for axis_array in axis_arrays]
+    axis_arrays = [axis_array * ones_like(A, dtype=axis_array.dtype) for axis_array in axis_arrays]
 
     data = [A.numpy(*axes).ravel()] + [axis_array.numpy(*axes).ravel() for axis_array in axis_arrays]
     columns = [label] + [axis._name for axis in axes]
-    df = pd.DataFrame({col:d for col, d in zip(columns, data)})
+    df = pd.DataFrame({col: d for col, d in zip(columns, data)})
     return df
+
+
+# Random key management ######################################################################################
+
+def get_int(x: int | ntensor | onp.integer | jnp.integer):
+    if isinstance(x, int):
+        return x
+    if isinstance(x, ntensor):
+        if x.shape != {}:
+            raise ValueError(f"Expected scalar (got shape {x.shape})")
+        return x.numpy().astype(int)
+    else:
+        return x.astype(int)
+
+    # if not jnp.issubdtype(x.dtype, jnp.integer):
+    #     raise ValueError(f"Expected int dtype (got {x.dtype})")
+    # return x
+
+
+@wrap
+def PRNGKey(seed, axis: str | Axis):
+    """
+    Parameters
+    ----------
+    seed
+        random seed. Can be anything convertible to int, including ntensor or numpy array
+    axis
+        axis label for the key
+
+    Returns
+    -------
+    PRNGKey
+        nbtensor with shape {axis:2}
+    """
+    return ntensor(jax.random.PRNGKey(get_int(seed)), axis)
+
+
+@wrap
+def random_split(key: ntensor, n: int | None = None, new_axis=None):
+    """
+
+    Parameters
+    ----------
+    key
+        ntensor PRNGKey
+    n
+        None (split into 2 ntensors) or int (REGULAR INT)
+    new_axis
+        new axes
+
+    Returns
+    -------
+    out
+        if n==None, returns tuple of 2 ntensor of same shape as key. if n is int, returns
+        an ntensor with shape of key plus additional new_axis with length n
+
+    """
+
+    if key.ndim != 1:
+        raise ValueError("only 1D arrays are supported")
+    old_axis, = key.axes
+    jax_key = key.numpy(old_axis)
+
+    if n is None and new_axis is None:
+        jax_a, jax_b = jax.random.split(jax_key)
+        return ntensor(jax_a, old_axis), ntensor(jax_b, old_axis)
+    elif n and new_axis:
+        if not isinstance(n, int):
+            raise ValueError(f"n must be int (got {n}) to ensure stable dimension")
+        if new_axis in key.axes:
+            raise ValueError(f"new axis {new_axis} already axis of key with shape {key.shape}")
+        jax_keys = jax.random.split(jax_key, n)
+        return ntensor(jax_keys, new_axis, old_axis)
+    else:
+        raise ValueError("either both n and new_axis must be none or both specified")
+
+
+@wrap
+def random_int(key: ntensor, shape: dict[str | Axis, int], minval, maxval):
+    minval = get_int(minval)
+    maxval = get_int(maxval)
+    if key.ndim != 1:
+        raise ValueError("only 1D arrays are supported")
+    old_axis, = key.axes
+    jax_key = key.numpy(old_axis)
+
+    jax_shape = tuple(shape[ax] for ax in shape)
+    axes = (ax for ax in shape)
+
+    jax_out = jax.random.randint(jax_key, jax_shape, minval=minval, maxval=maxval)
+
+    return ntensor(jax_out, *axes)
+
+
+@wrap
+def random_normal(key, shape: dict[str | Axis, int] = {}):
+    if key.ndim != 1:
+        raise ValueError("only 1D arrays are supported")
+    jax_shape = tuple(shape[ax] for ax in shape)
+    axes = (ax for ax in shape)
+    return ntensor(jax.random.normal(key.numpy(), jax_shape), *axes)
+
+
+@wrap
+def random_categorical(key, logits, shape: dict[str | Axis, int] = {}):
+    if key.ndim != 1:
+        raise ValueError("only 1D arrays are supported")
+    if logits.ndim != 1:
+        raise ValueError("only 1D arrays are supported")
+    if key.axes == logits.axes:
+        raise ValueError(f"key axes {key.axes} same as logits axes {logits.axes}")
+
+    jax_key = key.numpy()
+    jax_logits = logits.numpy()
+    jax_shape = tuple(shape[ax] for ax in shape)
+    axes = (ax for ax in shape)
+
+    jax_out = jax.random.categorical(jax_key, jax_logits, shape=jax_shape)
+
+    return ntensor(jax_out, *axes)
