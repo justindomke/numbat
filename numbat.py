@@ -1514,6 +1514,42 @@ def randn(**kwargs: int):
 
 # Mangling arrays # ##########################################################################################
 
+def rename(A: ntensor, axes: dict):
+    """
+
+    Parameters
+    ----------
+    A
+        ntensor
+    axes
+        dict mapping old axes to new
+
+    Returns
+    -------
+    B
+        new ntensor
+
+    Examples
+    --------
+    >>> A = ntensor([0,1,2],'i')
+    >>> rename(A,{'i':'j'})
+    <ntensor {j:3} [0 1 2]>
+
+    >>> A = ntensor([[0,1,2],[3,4,5]],'i','j')
+    >>> rename(A,{'i':'n'})
+    <ntensor {n:2, j:3}
+    [[0 1 2]
+     [3 4 5]]>
+    >>> rename(A,{'j':'k'})
+    <ntensor {i:2, k:3}
+    [[0 1 2]
+     [3 4 5]]>
+    """
+    for old_ax in axes:
+        assert old_ax in A.axes
+    new_axes_ordered = tuple(axes[ax] if ax in axes else ax for ax in A._axes_ordered)
+    return ntensor(A._data, *new_axes_ordered)
+
 def concatenate(arrays: Sequence[ntensor], axis: str | Axis) -> ntensor:
     """Concatenate a sequence of NTensors into a NTensor.
 
@@ -1554,6 +1590,14 @@ def concatenate(arrays: Sequence[ntensor], axis: str | Axis) -> ntensor:
     <ntensor {i:2, j:4}
     [[1 2 5 6]
      [3 4 7 8]]>
+
+    >>> A = ntensor([[1,2],[3,4]],'i','j')
+    >>> B = ntensor([5,6],'j')
+    >>> concatenate([A,B],axis='i')
+    <ntensor {j:2, i:3}
+    [[1 3 5]
+     [2 4 6]]>
+
     """
     axis = Axis(axis)
     return lift(jnp.concatenate, in_axes=[axis], out_axes=[axis])(arrays)
@@ -3097,21 +3141,19 @@ def get_int(x: int | ntensor | onp.integer | jnp.integer):
 
 
 @wrap
-def PRNGKey(seed, axis: str | Axis):
+def random_key(seed):
     """
     Parameters
     ----------
     seed
         random seed. Can be anything convertible to int, including ntensor or numpy array
-    axis
-        axis label for the key
 
     Returns
     -------
     PRNGKey
         nbtensor with shape {axis:2}
     """
-    return ntensor(jax.random.PRNGKey(get_int(seed)), axis)
+    return ntensor(jax.random.key(get_int(seed)))
 
 
 @wrap
@@ -3135,21 +3177,20 @@ def random_split(key: ntensor, n: int | None = None, new_axis=None):
 
     """
 
-    if key.ndim != 1:
-        raise ValueError("only 1D arrays are supported")
-    old_axis, = key.axes
-    jax_key = key.numpy(old_axis)
+    if key.ndim != 0:
+        raise ValueError("only 0D keys are supported")
+    jax_key = key.numpy()
 
     if n is None and new_axis is None:
         jax_a, jax_b = jax.random.split(jax_key)
-        return ntensor(jax_a, old_axis), ntensor(jax_b, old_axis)
+        return ntensor(jax_a), ntensor(jax_b)
     elif n and new_axis:
         if not isinstance(n, int):
             raise ValueError(f"n must be int (got {n}) to ensure stable dimension")
         if new_axis in key.axes:
             raise ValueError(f"new axis {new_axis} already axis of key with shape {key.shape}")
         jax_keys = jax.random.split(jax_key, n)
-        return ntensor(jax_keys, new_axis, old_axis)
+        return ntensor(jax_keys, new_axis)
     else:
         raise ValueError("either both n and new_axis must be none or both specified")
 
@@ -3158,10 +3199,9 @@ def random_split(key: ntensor, n: int | None = None, new_axis=None):
 def random_int(key: ntensor, shape: dict[str | Axis, int], minval, maxval):
     minval = get_int(minval)
     maxval = get_int(maxval)
-    if key.ndim != 1:
-        raise ValueError("only 1D arrays are supported")
-    old_axis, = key.axes
-    jax_key = key.numpy(old_axis)
+    if key.ndim != 0:
+        raise ValueError("only 0D keys are supported")
+    jax_key = key.numpy()
 
     jax_shape = tuple(shape[ax] for ax in shape)
     axes = (ax for ax in shape)
@@ -3173,8 +3213,8 @@ def random_int(key: ntensor, shape: dict[str | Axis, int], minval, maxval):
 
 @wrap
 def random_normal(key, shape: dict[str | Axis, int] = {}):
-    if key.ndim != 1:
-        raise ValueError("only 1D arrays are supported")
+    if key.ndim != 0:
+        raise ValueError("only 0D keys are supported")
     jax_shape = tuple(shape[ax] for ax in shape)
     axes = (ax for ax in shape)
     return ntensor(jax.random.normal(key.numpy(), jax_shape), *axes)
@@ -3182,8 +3222,8 @@ def random_normal(key, shape: dict[str | Axis, int] = {}):
 
 @wrap
 def random_categorical(key, logits, shape: dict[str | Axis, int] = {}):
-    if key.ndim != 1:
-        raise ValueError("only 1D arrays are supported")
+    if key.ndim != 0:
+        raise ValueError("only 0D keys are supported")
     if logits.ndim != 1:
         raise ValueError("only 1D arrays are supported")
     if key.axes == logits.axes:

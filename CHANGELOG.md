@@ -1,3 +1,7 @@
+**2025.03.04**
+
+* Use modern (scalar) Jax random keys
+
 **2025.03.03**
 
 * Improved static type checking for `wrap`ed functions
